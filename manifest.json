@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "PokePixel - senha",
+  "version": "1.0.0",
+  "description": "Guarda a sua senha do PokePixel e a cola no campo de login com um botao.",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": ["https://pokepixel.nietore.com/*", "https://poke.idleworld.online/*"],
+      "js": ["senha.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
