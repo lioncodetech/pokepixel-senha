@@ -39,7 +39,10 @@
   const caixa = document.createElement('div');
   caixa.style.cssText =
     'position:fixed;right:14px;bottom:14px;z-index:2147483647;display:none;gap:6px;' +
-    'align-items:center;font:13px system-ui,sans-serif;user-select:none';
+    'align-items:center;font:13px system-ui,sans-serif;user-select:none;' +
+    // Transparente em repouso, nitida ao chegar perto: na tela de login ela fica por cima do
+    // jogo, e opaca o tempo todo tapa o que esta' atras sem precisar.
+    'opacity:.82;transition:opacity .15s';
   const estiloBotao =
     'background:#1d2433;color:#e6e9ef;border:1px solid #3a4152;border-radius:8px;' +
     'padding:7px 12px;cursor:pointer';
@@ -268,8 +271,31 @@
   alca.addEventListener('pointerup', soltar);
   alca.addEventListener('pointercancel', soltar);
 
+  // Rearranjar as views do LionMultInstance muda o tamanho da janela; sem isto os botoes
+  // ficariam pendurados fora dela, onde nao da' para clicar.
+  let ajuste = 0;
+  addEventListener('resize', () => {
+    clearTimeout(ajuste);
+    ajuste = setTimeout(() => {
+      if (caixa.style.display === 'none' || !caixa.style.left) return;
+      posicionar(parseFloat(caixa.style.left) || 0, parseFloat(caixa.style.top) || 0);
+    }, 150);
+  });
+
   caixa.append(alca, entradaUsuario, entrada, engrenagem, botao);
   document.body.appendChild(caixa);
+
+  // Enquanto se digita a senha o foco segura a nitidez: so' o mouse sair nao basta para apagar o
+  // campo que ainda esta' em uso.
+  let sobCursor = false;
+  const nitidez = () => {
+    const usando = sobCursor || caixa.contains(document.activeElement);
+    caixa.style.opacity = usando ? '1' : '.82';
+  };
+  caixa.addEventListener('pointerenter', () => ((sobCursor = true), nitidez()));
+  caixa.addEventListener('pointerleave', () => ((sobCursor = false), nitidez()));
+  caixa.addEventListener('focusin', nitidez);
+  caixa.addEventListener('focusout', () => setTimeout(nitidez, 0));
 
   let salva = null;
   void ler(CHAVE_POS).then((pos) => {

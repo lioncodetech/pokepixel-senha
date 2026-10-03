@@ -26,6 +26,8 @@ entra, para não atrapalhar o jogo.
   corrigi-lo sem redigitar; a senha nunca volta para a tela.
 - Para apagar os dois: **definir**, limpe o usuário e depois **apagar** com os dois campos vazios.
 - **⠿** — arraste para mover os botões. A posição é lembrada.
+- Se a janela encolher — rearranjo das views —, os botões voltam para dentro dela, em vez de
+  ficarem pendurados fora, onde não dá para clicar.
 
 ## O que ela acessa
 
@@ -50,6 +52,12 @@ servidor, conta nem sincronização nesta extensão.
 ## Onde funciona
 
 `pokepixel.nietore.com` e `poke.idleworld.online`. Em qualquer outro site ela não é carregada.
+
+## Transparência
+
+A caixa fica um pouco transparente em repouso, para não tapar o jogo atrás dela, e volta ao normal
+assim que o mouse ou o cursor de texto chega perto. Os avisos rápidos, que somem sozinhos, ficam
+sempre no mesmo meio-termo.
 
 ## Instalação
 
