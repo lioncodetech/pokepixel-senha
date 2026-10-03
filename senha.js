@@ -1,5 +1,6 @@
 (() => {
   const CHAVE = 'pp-senha';
+  const CHAVE_USUARIO = 'pp-usuario';
   const CHAVE_POS = 'pp-senha-pos';
   const api = globalThis.chrome && chrome.storage && chrome.storage.local;
 
@@ -42,6 +43,9 @@
   const estiloBotao =
     'background:#1d2433;color:#e6e9ef;border:1px solid #3a4152;border-radius:8px;' +
     'padding:7px 12px;cursor:pointer';
+  const estiloCampo =
+    'display:none;background:#11151d;color:#e6e9ef;border:1px solid #3a4152;' +
+    'border-radius:8px;padding:7px 10px;width:130px';
 
   const alca = document.createElement('span');
   alca.textContent = '⠿';
@@ -51,19 +55,24 @@
     'background:#1d2433;border:1px solid #3a4152;border-radius:8px';
 
   const botao = document.createElement('button');
-  botao.textContent = 'Colar senha';
+  botao.textContent = 'Colar login';
   botao.style.cssText = estiloBotao;
 
   const engrenagem = document.createElement('button');
   engrenagem.textContent = 'definir';
   engrenagem.style.cssText = estiloBotao;
 
+  const entradaUsuario = document.createElement('input');
+  entradaUsuario.type = 'text';
+  entradaUsuario.placeholder = 'usuário';
+  entradaUsuario.autocomplete = 'off';
+  entradaUsuario.spellcheck = false;
+  entradaUsuario.style.cssText = estiloCampo;
+
   const entrada = document.createElement('input');
   entrada.type = 'password';
   entrada.placeholder = 'senha, e Enter';
-  entrada.style.cssText =
-    'display:none;background:#11151d;color:#e6e9ef;border:1px solid #3a4152;' +
-    'border-radius:8px;padding:7px 10px;width:170px';
+  entrada.style.cssText = estiloCampo;
 
   const recado = (alvo, texto, voltarPara) => {
     alvo.textContent = texto;
@@ -78,10 +87,56 @@
     }
   };
 
+  const nossos = [entrada, entradaUsuario];
+  const aVista = (el) => el.offsetParent !== null && !nossos.includes(el);
+
+  // A tela de criar conta do jogo tem dois campos de senha, os dois marcados new-password. Colar
+  // ali nao faz sentido — isto serve para entrar, nao para se cadastrar —, e deixar a caixa de
+  // fora dessa tela e mais honesto do que preencher so metade do cadastro.
   const campoSenha = () =>
     [...document.querySelectorAll('input[type="password"]')].find(
-      (el) => el.offsetParent !== null && el !== entrada,
+      (el) => aVista(el) && el.autocomplete !== 'new-password',
     ) || null;
+
+  // So os arredores do campo de senha: a busca para tras solta pela pagina inteira achava a
+  // caixa de busca do site numa tela que pedia so a senha, e escrevia o usuario la dentro.
+  const arredores = (senha) => {
+    const form = senha.closest('form');
+    if (form) return form;
+    let no = senha.parentElement || document.body;
+    for (let i = 0; i < 3; i += 1) {
+      const acima = no.parentElement;
+      if (!acima || acima === document.body) break;
+      no = acima;
+    }
+    return no;
+  };
+
+  // A tela do PokePixel marca o campo com autocomplete="username", que e o sinal que o proprio
+  // navegador usa: vale mais do que qualquer palpite nosso. Os outros dois padroes cobrem telas
+  // que nao marcam nada.
+  const MARCAS = [
+    'input[autocomplete="username"]',
+    'input[autocomplete="email"]',
+    'input[type="email"]',
+  ];
+  const ESCREVIVEIS = ['text', 'email', 'tel', 'url', ''];
+  const campoUsuario = (senha = campoSenha()) => {
+    if (!senha) return null;
+    const perto = arredores(senha);
+    for (const marca of MARCAS) {
+      const el = [...perto.querySelectorAll(marca)].find(aVista);
+      if (el) return el;
+    }
+    // Sem marca nenhuma, sobra a ordem, que e a unica coisa que toda tela de login respeita: o
+    // usuario vem logo antes da senha. A busca anda para tras a partir dela.
+    const campos = [...perto.querySelectorAll('input')];
+    for (let i = campos.indexOf(senha) - 1; i >= 0; i -= 1) {
+      const el = campos[i];
+      if (aVista(el) && ESCREVIVEIS.includes(el.type.toLowerCase())) return el;
+    }
+    return null;
+  };
 
   // React nao percebe uma atribuicao direta em .value: e preciso usar o setter nativo do
   // elemento e avisar a pagina, senao o formulario continua achando que o campo esta vazio.
@@ -95,49 +150,83 @@
   botao.onclick = comAviso(
     async () => {
       const campo = campoSenha();
-      if (!campo) return recado(botao, 'sem campo', 'Colar senha');
-      const senha = await ler(CHAVE);
-      if (!senha) return recado(botao, 'nada guardado', 'Colar senha');
-      preencher(campo, senha);
+      if (!campo) return recado(botao, 'sem campo', 'Colar login');
+      const [senha, usuario] = await Promise.all([ler(CHAVE), ler(CHAVE_USUARIO)]);
+      if (!senha && !usuario) return recado(botao, 'nada guardado', 'Colar login');
+      // Quem instalou a versao que so guardava a senha continua com ela funcionando: o usuario
+      // e preenchido apenas quando existe um guardado.
+      const doUsuario = usuario ? campoUsuario(campo) : null;
+      if (doUsuario) preencher(doUsuario, usuario);
+      if (senha) preencher(campo, senha);
       campo.focus();
-      recado(botao, 'colada', 'Colar senha');
+      // Dizer que faltou o campo de usuario importa: sem esse aviso, um login que entrou so com
+      // a senha pareceria ter funcionado.
+      recado(botao, usuario && !doUsuario ? 'sem campo de usuário' : 'colado', 'Colar login');
     },
     botao,
-    'Colar senha',
+    'Colar login',
   );
+
+  const fecharCampos = () => {
+    entradaUsuario.style.display = 'none';
+    entrada.style.display = 'none';
+    entradaUsuario.value = '';
+    entrada.value = '';
+    engrenagem.textContent = 'definir';
+  };
+
+  // Guarda o que foi digitado e deixa em paz o que ficou vazio: assim da para trocar so a senha,
+  // ou so o usuario, sem ter de digitar os dois de novo.
+  const salvarCampos = async () => {
+    const usuario = entradaUsuario.value.trim();
+    const senha = entrada.value;
+    if (!usuario && !senha) return;
+    if (usuario) await guardar(CHAVE_USUARIO, usuario);
+    if (senha) await guardar(CHAVE, senha);
+    recado(botao, 'guardado', 'Colar login');
+    fecharCampos();
+  };
 
   engrenagem.onclick = comAviso(
     async () => {
       if (entrada.style.display === 'none') {
+        entradaUsuario.style.display = 'block';
         entrada.style.display = 'block';
+        // O usuario guardado aparece ja escrito, para dar para corrigir sem redigitar. A senha
+        // nunca: ela nao volta para a tela depois de guardada.
+        entradaUsuario.value = (await ler(CHAVE_USUARIO)) || '';
         entrada.value = '';
-        entrada.focus();
+        entradaUsuario.focus();
         engrenagem.textContent = 'apagar';
         return;
       }
-      if (!entrada.value) {
-        await apagar(CHAVE);
-        recado(botao, 'apagada', 'Colar senha');
+      if (!entradaUsuario.value.trim() && !entrada.value) {
+        await Promise.all([apagar(CHAVE), apagar(CHAVE_USUARIO)]);
+        recado(botao, 'apagado', 'Colar login');
+        fecharCampos();
+        return;
       }
-      entrada.style.display = 'none';
-      engrenagem.textContent = 'definir';
+      await salvarCampos();
     },
     engrenagem,
     'definir',
   );
 
+  entradaUsuario.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    entrada.focus();
+  });
+
   entrada.addEventListener('keydown', async (e) => {
-    if (e.key !== 'Enter' || !entrada.value) return;
+    if (e.key !== 'Enter') return;
     e.preventDefault();
     try {
-      await guardar(CHAVE, entrada.value);
-      recado(botao, 'guardada', 'Colar senha');
+      await salvarCampos();
     } catch (err) {
-      recado(botao, 'erro ao guardar', 'Colar senha');
+      recado(botao, 'erro ao guardar', 'Colar login');
+      fecharCampos();
     }
-    entrada.value = '';
-    entrada.style.display = 'none';
-    engrenagem.textContent = 'definir';
   });
 
   // Uma janela menor, ou um monitor trocado, nao pode deixar o botao fora do alcance.
@@ -179,7 +268,7 @@
   alca.addEventListener('pointerup', soltar);
   alca.addEventListener('pointercancel', soltar);
 
-  caixa.append(alca, entrada, engrenagem, botao);
+  caixa.append(alca, entradaUsuario, entrada, engrenagem, botao);
   document.body.appendChild(caixa);
 
   let salva = null;
@@ -195,5 +284,6 @@
     visivel = deveAparecer;
     caixa.style.display = deveAparecer ? 'flex' : 'none';
     if (deveAparecer && salva) posicionar(salva.x, salva.y);
+    if (!deveAparecer) fecharCampos();
   }, 1000);
 })();

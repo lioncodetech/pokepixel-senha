@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "PokePixel - senha",
-  "version": "1.0.0",
-  "description": "Guarda a sua senha do PokePixel e a cola no campo de login com um botao.",
+  "version": "1.1.0",
+  "description": "Guarda o seu usuario e a sua senha do PokePixel e os cola nos campos de login com um botao.",
   "permissions": ["storage"],
   "content_scripts": [
     {
